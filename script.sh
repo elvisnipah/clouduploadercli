@@ -6,8 +6,12 @@ if [ $1 ] && [ $2 ]; then
     echo "You can have only 3 arguments"
     exit
   fi
-  echo "Arg 1 exists: $1"
-  echo "Arg 2 exists: $2"
+  
+  if [ -f $1 ]; then
+    echo "This is a file"
+  else
+    echo "This is not a file"
+  fi
 else
   echo "You must add two arguments to this command"
   exit
