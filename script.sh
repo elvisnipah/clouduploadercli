@@ -31,12 +31,29 @@ upload_file() {
   )
 
   # check if the overwrite variable is set to 0 (true)
-  # and if true, add the '--overwrite' argument
+  # and if true, add the '--overwrite' argument to the array
   (( "$overwrite" == 0 )) && args+=( "--overwrite" )
 
-  # call the function will every member of the arguments
+  # call the function with every member of the arguments
   # array
   az storage blob upload "${args[@]}"
+}
+
+# check if blob exists already
+check_blob_exists() {
+  local args=()
+  local container_name="$arg2"
+  local file_name="$arg1"
+  
+  # add the arguments for the command
+  args+=(
+    "--account-name" "elvisnipahstorage"
+    "--container-name" "$container_name"
+    "--name" "$file_name"
+    "--auth-mode" "login"
+  )
+
+  az storage blob show "${args[@]}"
 }
 
 # variable to store user's file overwrite choice
@@ -45,7 +62,7 @@ overwrite_check=1
 while : 
 do
   # check if the first argument is empty. if it is, prompt
-  # the user in the cli for the first arg
+  # the user in the cli for it
   if [ -z "$1" ]; then
     read -p "Enter the path to the file you want to upload: " arg1
   else
@@ -80,40 +97,49 @@ do
   # checks the return code of the last executed command
   # 0 means success, non-zero means fail, usually
   if [ $? -eq 0 ]; then
-    # store the output in the result variable
-    result=$((upload_file $overwrite_check)\
-    2>&1)
+    # check if the blob exists
+    blob_exists=$((check_blob_exists) 2>&1)
+    
+    if echo "$blob_exists" | grep -q "ErrorCode:BlobNotFound" || [ $overwrite_check -eq 0 ]; then
+      # store the output in the result variable
+      result=$((upload_file $overwrite_check) 2>&1)
 
-    # if the last command was successful, do thing
-    # and exit the program
-    if [ $? -eq 0 ]; then
-      echo "File upload was successful."
-      # -o means output only. match the 'https://' part of the string
-      # "[^']" matches any characters that are not a ', since the string
-      # ends with a '. 'head -n1' takes only the first line of output
-      # in case there are multiple matches
-      echo "$result" > log.txt
-      echo -n "File link: "
-      echo "$result" | grep -o "https://[^']*" | head -n1
-      exit 0
-    else
-      # check if the error code "blobalreadyexists" is in the output
-      # then reprompt the user if they want to overwrite the file
-      if echo "$result" | grep -q "ErrorCode:BlobAlreadyExists"; then
-        echo "This file already exists in this container."
-        read -p "Do you want to overwrite the file? (y/n): " check
-        if [[ "$check" == "y" ]] || [[ "$check" == "Y" ]]; then
-          overwrite_check=0
-          continue
-        else
-          exit 1
-        fi
+      # if the last command was successful, do thing
+      # and exit the program
+      if [ $? -eq 0 ]; then
+        echo "File upload was successful."
+        echo "$result" > log.txt
+        echo -n "File link: "
+        # -o means output only. match the 'https://' part of the string
+        # "[^']" matches any characters that are not a ', since the string
+        # ends with a '. 'head -n1' takes only the first line of output
+        # in case there are multiple matches
+        echo "$result" | grep -o "https://[^']*" | head -n1
+        exit 0
+      # check for wrong container name error
+      elif echo "$result" | grep -q "ErrorCode:ContainerNotFound"; then
+        echo "Oops, that seems to be a wrong container name. Please try again."
+        exit 1
+      else
+        echo "$result"
+        exit 1
       fi
-      # exit the program and print the error from azure
-      echo "It did not work :<"
-      echo "$result"
-      exit 1
+    else
+      echo "This file already exists in the container."
+      read -p "Do you want to overwrite the file? (y/n): " check
+      if [[ "$check" == "y" ]] || [[ "$check" == "Y" ]]; then
+        overwrite_check=0
+        continue
+      else
+        exit 1
+      fi
+        
+        # exit the program and print the error from azure
+        echo "It did not work :<"
+        echo "$result"
+        exit 1
     fi
+
   # exit the program as something failed before az (probably file check)
   else
     echo "The function failed"
