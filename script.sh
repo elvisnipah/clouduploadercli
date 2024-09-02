@@ -94,13 +94,13 @@ do
     exit 1
   fi
 
-  # checks the return code of the last executed command
+  # checks the return code of the check_if_file_exists
   # 0 means success, non-zero means fail, usually
   if [ $? -eq 0 ]; then
     # check if the blob exists
-    blob_exists=$((check_blob_exists) 2>&1)
+    blob_status=$((check_blob_exists) 2>&1)
     
-    if echo "$blob_exists" | grep -q "ErrorCode:BlobNotFound" || [ $overwrite_check -eq 0 ]; then
+    if echo "$blob_status" | grep -q "ErrorCode:BlobNotFound" || [ $overwrite_check -eq 0 ]; then
       # store the output in the result variable
       result=$((upload_file $overwrite_check) 2>&1)
 
@@ -116,14 +116,14 @@ do
         # in case there are multiple matches
         echo "$result" | grep -o "https://[^']*" | head -n1
         exit 0
-      # check for wrong container name error
-      elif echo "$result" | grep -q "ErrorCode:ContainerNotFound"; then
-        echo "Oops, that seems to be a wrong container name. Please try again."
-        exit 1
       else
         echo "$result"
         exit 1
       fi
+    # check for wrong container name error
+    elif echo "$blob_status" | grep -q "ErrorCode:ContainerNotFound"; then
+      echo "Oops, that seems to be a wrong container name. Please try again."
+      exit 1
     else
       echo "This file already exists in the container."
       read -p "Do you want to overwrite the file? (y/n): " check
