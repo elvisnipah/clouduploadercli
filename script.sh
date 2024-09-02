@@ -88,7 +88,13 @@ do
     # and exit the program
     if [ $? -eq 0 ]; then
       echo "File upload was successful."
-      echo $result
+      # -o means output only. match the 'https://' part of the string
+      # "[^']" matches any characters that are not a ', since the string
+      # ends with a '. 'head -n1' takes only the first line of output
+      # in case there are multiple matches
+      echo "$result" > log.txt
+      echo -n "File link: "
+      echo "$result" | grep -o "https://[^']*" | head -n1
       exit 0
     else
       # check if the error code "blobalreadyexists" is in the output
@@ -105,10 +111,10 @@ do
       fi
       # exit the program and print the error from azure
       echo "It did not work :<"
-      echo "${result}"
+      echo "$result"
       exit 1
     fi
-  # exit the program as something failed before az
+  # exit the program as something failed before az (probably file check)
   else
     echo "The function failed"
     exit 1
